@@ -1,0 +1,7 @@
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/apexchat}
+    username: ${DB_USER:apexchat}
+    password: ${DB_PASSWORD:apexchat}
+    hikari:
+      maximum-pool-size: 10

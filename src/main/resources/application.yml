@@ -1,0 +1,57 @@
+spring:
+  application:
+    name: apexchat
+  # Default profile: zero-setup in-memory H2 running in PostgreSQL compatibility mode.
+  # Use the `postgres` profile (see application-postgres.yml / docker-compose.yml) for durable storage.
+  datasource:
+    url: jdbc:h2:mem:apexchat;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+server:
+  port: ${PORT:8080}
+  shutdown: graceful
+  servlet:
+    session:
+      timeout: 8h
+      cookie:
+        http-only: true
+        same-site: lax
+  compression:
+    enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  info:
+    build:
+      enabled: true
+
+apexchat:
+  max-message-length: 2000
+  history-page-size: 50
+  max-history-page-size: 100
+  rate-limit:
+    max-messages: 20
+    window: 10s
+  # Same-origin connections are always allowed. Add origins here only if the UI is served elsewhere.
+  allowed-origins: []
+
+logging:
+  level:
+    com.apexchat: INFO
