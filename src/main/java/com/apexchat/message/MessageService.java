@@ -13,6 +13,7 @@ import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -43,7 +44,7 @@ public class MessageService {
       ChatMessageRepository messages,
       RoomService roomService,
       UserService userService,
-      RateLimiter rateLimiter,
+      @Qualifier("messageRateLimiter") RateLimiter rateLimiter,
       SimpMessagingTemplate broker,
       ChatProperties properties,
       Clock clock,

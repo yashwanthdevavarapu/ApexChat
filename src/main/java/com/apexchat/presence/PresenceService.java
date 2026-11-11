@@ -2,26 +2,41 @@ package com.apexchat.presence;
 
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.time.Clock;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
 import org.springframework.stereotype.Service;
 
 /**
  * Tracks which users are online by counting their live STOMP sessions.
  *
  * <p>A user with three tabs open has three sessions; they go offline only when the last one closes.
- * All updates go through {@link ConcurrentHashMap#compute} so concurrent connects and disconnects
- * for the same user are serialized without a global lock (see docs/adr/0006).
+ * Mutations are serialized on this instance (presence changes are rare, so contention is
+ * negligible) and every transition bumps a monotonically increasing {@link Roster#version()} that
+ * clients use to discard stale, out-of-order presence frames. Closed session ids are remembered
+ * briefly so a disconnect processed <em>before</em> its connect event cannot leave a ghost session
+ * behind. See docs/adr/0006.
  */
 @Service
 public class PresenceService {
 
-  private final Map<String, Set<String>> sessionsByUser = new ConcurrentHashMap<>();
+  static final long CLOSED_SESSION_TTL_MS = 60_000;
+  private static final int PURGE_EVERY = 256;
 
-  public PresenceService(MeterRegistry registry) {
+  private final Map<String, Set<String>> sessionsByUser = new ConcurrentHashMap<>();
+  private final Map<String, Long> closedSessions = new HashMap<>(); // guarded by this
+  private final Clock clock;
+  private long version; // guarded by this
+  private long disconnects; // guarded by this
+
+  /** The online users as of a specific presence version. */
+  public record Roster(List<String> online, long version) {}
+
+  public PresenceService(MeterRegistry registry, Clock clock) {
+    this.clock = clock;
     Gauge.builder("apexchat.presence.online.users", sessionsByUser, Map::size)
         .description("Users with at least one live WebSocket session")
         .register(registry);
@@ -35,17 +50,18 @@ public class PresenceService {
    *
    * @return {@code true} if this is the user's first session, i.e. they just came online
    */
-  public boolean connect(String username, String sessionId) {
-    AtomicBoolean cameOnline = new AtomicBoolean();
-    sessionsByUser.compute(
-        username,
-        (user, sessions) -> {
-          Set<String> set = sessions == null ? ConcurrentHashMap.newKeySet() : sessions;
-          cameOnline.set(set.isEmpty());
-          set.add(sessionId);
-          return set;
-        });
-    return cameOnline.get();
+  public synchronized boolean connect(String username, String sessionId) {
+    if (closedSessions.containsKey(sessionId)) {
+      return false; // the disconnect for this session was already processed
+    }
+    Set<String> sessions =
+        sessionsByUser.computeIfAbsent(username, u -> ConcurrentHashMap.newKeySet());
+    boolean cameOnline = sessions.isEmpty();
+    sessions.add(sessionId);
+    if (cameOnline) {
+      version++;
+    }
+    return cameOnline;
   }
 
   /**
@@ -53,18 +69,19 @@ public class PresenceService {
    *
    * @return {@code true} if that was the user's last session, i.e. they just went offline
    */
-  public boolean disconnect(String username, String sessionId) {
-    AtomicBoolean wentOffline = new AtomicBoolean();
-    sessionsByUser.computeIfPresent(
-        username,
-        (user, sessions) -> {
-          if (sessions.remove(sessionId) && sessions.isEmpty()) {
-            wentOffline.set(true);
-            return null;
-          }
-          return sessions.isEmpty() ? null : sessions;
-        });
-    return wentOffline.get();
+  public synchronized boolean disconnect(String username, String sessionId) {
+    rememberClosed(sessionId);
+    Set<String> sessions = sessionsByUser.get(username);
+    if (sessions == null || !sessions.remove(sessionId) || !sessions.isEmpty()) {
+      return false;
+    }
+    sessionsByUser.remove(username);
+    version++;
+    return true;
+  }
+
+  public synchronized Roster roster() {
+    return new Roster(onlineUsers(), version);
   }
 
   public boolean isOnline(String username) {
@@ -82,5 +99,17 @@ public class PresenceService {
   public int sessionCount(String username) {
     Set<String> sessions = sessionsByUser.get(username);
     return sessions == null ? 0 : sessions.size();
+  }
+
+  synchronized int rememberedClosedSessions() {
+    return closedSessions.size();
+  }
+
+  private void rememberClosed(String sessionId) {
+    long now = clock.millis();
+    closedSessions.put(sessionId, now);
+    if (++disconnects % PURGE_EVERY == 0) {
+      closedSessions.values().removeIf(closedAt -> now - closedAt > CLOSED_SESSION_TTL_MS);
+    }
   }
 }

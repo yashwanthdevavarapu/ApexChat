@@ -46,7 +46,7 @@ persistent connection.
 | 💬 **Full chat UX** | Channels and DMs, unread badges, typing indicators, message grouping and day dividers, safe auto-linking, deep links (`#room/general`, `#dm/alice`), dark and light themes, mobile layout. |
 | 🔐 **Secure by default** | BCrypt form login, **CSRF token required on STOMP CONNECT** (blocks cross-site WebSocket hijacking), a destination allow-list for every frame, strict CSP, per-user rate limiting, XSS-safe rendering ([ADR-0005](docs/adr/0005-websocket-authentication-and-csrf.md)). |
 | 🗄️ **Durable history** | Persisted before broadcast. Keyset-paginated history API. Flyway schema that runs on PostgreSQL 16 and H2 ([ADR-0004](docs/adr/0004-persist-then-broadcast.md)). |
-| ✅ **Tested at every layer** | 46 unit tests, 30 integration tests (real STOMP client and real WebSocket, plus PostgreSQL via Testcontainers) and 26 Playwright end-to-end tests with multiple simultaneous browsers. **96% line coverage**, with a gate in CI. |
+| ✅ **Tested at every layer** | 56 unit tests, 32 integration tests (real STOMP client and real WebSocket, plus PostgreSQL via Testcontainers) and 26 Playwright end-to-end tests with multiple simultaneous browsers. **96% line coverage**, with a gate in CI. |
 | 📦 **Ship-ready** | Layered Docker image (non-root, healthcheck), `docker compose` stack with PostgreSQL, Prometheus metrics, GitHub Actions for CI, CodeQL, dependency review and tagged releases to GHCR. |
 
 **Tech:** Java 17 · Spring Boot 3.5 (Web, WebSocket, Security, Data JPA, Actuator) · STOMP ·

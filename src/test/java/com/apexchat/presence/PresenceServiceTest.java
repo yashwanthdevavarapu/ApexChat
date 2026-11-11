@@ -2,7 +2,10 @@ package com.apexchat.presence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.apexchat.support.MutableClock;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -18,11 +21,13 @@ class PresenceServiceTest {
 
   private SimpleMeterRegistry registry;
   private PresenceService presence;
+  private MutableClock clock;
 
   @BeforeEach
   void setUp() {
     registry = new SimpleMeterRegistry();
-    presence = new PresenceService(registry);
+    clock = new MutableClock(Instant.parse("2026-01-01T00:00:00Z"));
+    presence = new PresenceService(registry, clock);
   }
 
   @Test
@@ -124,5 +129,39 @@ class PresenceServiceTest {
     assertThat(online.get()).isPositive().isEqualTo(offline.get());
     assertThat(presence.isOnline("alice")).isFalse();
     assertThat(presence.sessionCount()).isZero();
+  }
+
+  @Test
+  void disconnectProcessedBeforeConnectDoesNotLeaveAGhostSession() {
+    // Spring may handle a socket that dropped immediately in either order
+    assertThat(presence.disconnect("alice", "s1")).isFalse();
+    assertThat(presence.connect("alice", "s1")).isFalse();
+    assertThat(presence.isOnline("alice")).isFalse();
+    assertThat(presence.sessionCount()).isZero();
+  }
+
+  @Test
+  void versionIncreasesOnEveryTransitionOnly() {
+    long v0 = presence.roster().version();
+    presence.connect("alice", "s1");
+    long v1 = presence.roster().version();
+    presence.connect("alice", "s2"); // not a transition
+    assertThat(presence.roster().version()).isEqualTo(v1);
+    presence.disconnect("alice", "s1"); // not a transition
+    assertThat(presence.roster().version()).isEqualTo(v1);
+    presence.disconnect("alice", "s2");
+    assertThat(v1).isGreaterThan(v0);
+    assertThat(presence.roster().version()).isGreaterThan(v1);
+    assertThat(presence.roster().online()).isEmpty();
+  }
+
+  @Test
+  void rememberedClosedSessionsArePurgedAfterTheirTtl() {
+    for (int i = 0; i < 255; i++) {
+      presence.disconnect("u", "old-" + i);
+    }
+    clock.advance(Duration.ofMillis(PresenceService.CLOSED_SESSION_TTL_MS + 1));
+    presence.disconnect("u", "fresh"); // 256th disconnect triggers a purge
+    assertThat(presence.rememberedClosedSessions()).isEqualTo(1);
   }
 }

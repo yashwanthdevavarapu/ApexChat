@@ -13,9 +13,15 @@ someone offline. Spring publishes `SessionConnectedEvent` and `SessionDisconnect
 
 ## Decision
 
-- `PresenceService` keeps a `ConcurrentHashMap<username, Set<sessionId>>`. Every mutation goes
-  through `compute`, which is atomic per key, so connects and disconnects for the same user are
-  serialized without a global lock.
+- `PresenceService` keeps a `ConcurrentHashMap<username, Set<sessionId>>` for lock-free reads
+  (gauges, snapshots). Mutations are `synchronized`: presence transitions are rare, so a single
+  lock costs nothing measurable and keeps the logic simple.
+- Every transition bumps a **version**. Each presence frame carries the roster *and* its version,
+  and clients ignore frames older than the newest one they have applied. Frames can overtake each
+  other on Spring's outbound thread pool, so this guard is required.
+- A closed session id is remembered for 60 s. If Spring's disconnect event is processed before the
+  connect event (a socket that drops immediately), the late connect is ignored instead of leaving a
+  ghost session that keeps the user "online" forever.
 - `connect` returns `true` only for the user's **first** session, and `disconnect` returns `true`
   only when the **last** session closes. Only those transitions are broadcast on `/topic/presence`.
   Removing an unknown session is a no-op, so duplicate disconnect events are harmless.

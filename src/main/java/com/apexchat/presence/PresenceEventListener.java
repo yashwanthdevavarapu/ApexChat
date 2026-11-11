@@ -11,7 +11,12 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.socket.messaging.SessionConnectedEvent;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 
-/** Turns STOMP session lifecycle events into presence updates on {@code /topic/presence}. */
+/**
+ * Turns STOMP session lifecycle events into presence updates on {@code /topic/presence}.
+ *
+ * <p>Each event carries the roster <em>and</em> its version. Frames may be delivered out of order
+ * by the outbound thread pool; clients keep only the highest version they have seen.
+ */
 @Component
 public class PresenceEventListener {
 
@@ -56,6 +61,6 @@ public class PresenceEventListener {
 
   private void publish(PresenceEvent.Type type, String username) {
     broker.convertAndSend(
-        PRESENCE_TOPIC, new PresenceEvent(type, username, presence.onlineUsers(), clock.instant()));
+        PRESENCE_TOPIC, PresenceEvent.of(type, username, presence.roster(), clock.instant()));
   }
 }

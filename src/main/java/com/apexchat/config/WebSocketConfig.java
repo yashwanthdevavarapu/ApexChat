@@ -1,9 +1,11 @@
 package com.apexchat.config;
 
-import org.springframework.context.annotation.Bean;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
+import org.springframework.scheduling.TaskScheduler;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
@@ -29,6 +31,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
   static final long HEARTBEAT_MS = 10_000;
 
   private final ChatProperties properties;
+  private TaskScheduler messageBrokerTaskScheduler;
 
   public WebSocketConfig(ChatProperties properties) {
     this.properties = properties;
@@ -47,7 +50,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     registry
         .enableSimpleBroker("/topic", "/queue")
         .setHeartbeatValue(new long[] {HEARTBEAT_MS, HEARTBEAT_MS})
-        .setTaskScheduler(heartbeatScheduler());
+        .setTaskScheduler(messageBrokerTaskScheduler);
     registry.setApplicationDestinationPrefixes("/app");
     registry.setUserDestinationPrefix("/user");
     // Deliberately NOT enabling preservePublishOrder / preserveReceiveOrder: in Spring 6.2 either
@@ -65,12 +68,13 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         .setSendTimeLimit(15_000);
   }
 
-  @Bean
-  ThreadPoolTaskScheduler heartbeatScheduler() {
-    var scheduler = new ThreadPoolTaskScheduler();
-    scheduler.setPoolSize(1);
-    scheduler.setThreadNamePrefix("ws-heartbeat-");
-    scheduler.initialize();
-    return scheduler;
+  /**
+   * Reuses the scheduler Spring's broker configuration already defines, as the Spring reference
+   * recommends; {@code @Lazy} breaks the cycle with the configuration that creates it.
+   */
+  @Autowired
+  void setMessageBrokerTaskScheduler(
+      @Lazy @Qualifier("messageBrokerTaskScheduler") TaskScheduler taskScheduler) {
+    this.messageBrokerTaskScheduler = taskScheduler;
   }
 }

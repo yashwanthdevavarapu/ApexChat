@@ -3,6 +3,7 @@ package com.apexchat.user;
 import com.apexchat.common.ConflictException;
 import java.time.Clock;
 import java.util.Locale;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -30,14 +31,25 @@ public class UserService implements UserDetailsService {
     return username == null ? "" : username.trim().toLowerCase(Locale.ROOT);
   }
 
-  @Transactional
+  /**
+   * Creates an account. The pre-check gives a friendly error in the common case; the unique
+   * constraint is the real guard when two sign-ups for the same name race.
+   */
   public AppUser register(String username, String rawPassword) {
     String normalized = normalize(username);
     if (users.existsByUsername(normalized)) {
-      throw new ConflictException("USERNAME_TAKEN", "That username is already taken");
+      throw usernameTaken();
     }
-    return users.save(
-        new AppUser(normalized, passwordEncoder.encode(rawPassword), clock.instant()));
+    try {
+      return users.saveAndFlush(
+          new AppUser(normalized, passwordEncoder.encode(rawPassword), clock.instant()));
+    } catch (DataIntegrityViolationException e) {
+      throw usernameTaken();
+    }
+  }
+
+  private static ConflictException usernameTaken() {
+    return new ConflictException("USERNAME_TAKEN", "That username is already taken");
   }
 
   @Transactional(readOnly = true)

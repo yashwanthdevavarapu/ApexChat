@@ -1,5 +1,6 @@
 package com.apexchat.config;
 
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import java.time.Duration;
 import java.util.List;
@@ -19,11 +20,14 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "apexchat")
 public record ChatProperties(
-    @DefaultValue("2000") @Min(1) int maxMessageLength,
+    @DefaultValue("2000") @Min(1) @Max(MESSAGE_COLUMN_LENGTH) int maxMessageLength,
     @DefaultValue("50") @Min(1) int historyPageSize,
     @DefaultValue("100") @Min(1) int maxHistoryPageSize,
     @DefaultValue List<String> allowedOrigins,
     @DefaultValue RateLimit rateLimit) {
+
+  /** Size of chat_message.content (V1 migration); the configurable limit can never exceed it. */
+  public static final int MESSAGE_COLUMN_LENGTH = 2000;
 
   /**
    * Sliding-window send limit applied per user across all of their sessions.

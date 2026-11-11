@@ -51,6 +51,7 @@ const els = {
 const state = {
   rooms: new Map(), // slug -> RoomDto
   online: [], // usernames, including me
+  presenceVersion: -1,
   dmPartners: new Set(), // people I have exchanged DMs with this session
   active: null, // { kind: "room" | "dm", id }
   messages: [], // MessageDto[] for the active conversation, oldest first
@@ -172,6 +173,7 @@ function setConnection(next) {
   els.conn.querySelector(".conn-label").textContent =
     { online: "Live", connecting: "Connecting", offline: "Reconnecting" }[next];
   state.connected = next === "online";
+  if (!state.connected) typingActive = false; // the "stopped typing" frame could not be sent
   updateComposer();
 }
 
@@ -186,7 +188,7 @@ function onConnect() {
   client.subscribe("/app/presence", (f) => onPresence(json(f)));
   client.subscribe("/user/queue/dm", (f) => onDirectMessage(json(f)));
   client.subscribe("/user/queue/typing", (f) => onDirectTyping(json(f)));
-  client.subscribe("/user/queue/errors", (f) => toast(json(f).message));
+  client.subscribe("/user/queue/errors", (f) => onCommandError(json(f)));
   for (const slug of state.rooms.keys()) subscribeRoom(slug);
 
   setConnection("online");
@@ -216,6 +218,16 @@ function subscribeRoom(slug) {
 }
 
 /* --------------------------------------------------------- live events */
+
+/** Rejected sends give the text back instead of losing it. */
+function onCommandError(err) {
+  toast(err.message);
+  if (["RATE_LIMITED", "MESSAGE_TOO_LONG"].includes(err.code) && lastSentDraft && !els.input.value) {
+    els.input.value = lastSentDraft;
+    autosize();
+    updateComposer();
+  }
+}
 
 function onRoomMessage(msg) {
   if (state.active?.kind === "room" && state.active.id === msg.room) {
@@ -248,6 +260,9 @@ function onDirectTyping(evt) {
 }
 
 function onPresence(evt) {
+  // Frames can overtake each other; the server-assigned version says which roster is newest
+  if (evt.version < state.presenceVersion) return;
+  state.presenceVersion = evt.version;
   state.online = evt.online;
   renderPeople();
   if (state.active?.kind === "dm") renderHeader();
@@ -550,6 +565,7 @@ function renderTyping() {
 }
 
 let typingActive = false;
+let lastSentDraft = "";
 let typingTimer;
 
 function destinationBase() {
@@ -581,6 +597,7 @@ function sendMessage() {
   const content = els.input.value.trim();
   if (!content || !state.connected || !state.active) return;
   client.publish({ destination: `${destinationBase()}/send`, body: JSON.stringify({ content }) });
+  lastSentDraft = content;
   sendTyping(false);
   els.input.value = "";
   autosize();

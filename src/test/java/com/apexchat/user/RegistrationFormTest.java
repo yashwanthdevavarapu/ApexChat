@@ -64,4 +64,13 @@ class RegistrationFormTest {
     assertThat(UserService.normalize("  MaYa ")).isEqualTo("maya");
     assertThat(UserService.normalize(null)).isEmpty();
   }
+
+  @Test
+  void passwordLimitIsMeasuredInBytesBecauseBcryptIs() {
+    String fortyTwoByteChars = "é".repeat(40); // 40 chars, 80 UTF-8 bytes
+    assertThat(invalidFields(form("maya", fortyTwoByteChars, fortyTwoByteChars)))
+        .containsExactly("passwordWithinHashLimit");
+    String ascii72 = "a".repeat(72);
+    assertThat(invalidFields(form("maya", ascii72, ascii72))).isEmpty();
+  }
 }

@@ -30,6 +30,8 @@
       <input id="password" type="password" th:field="*{password}" autocomplete="new-password" required
              th:classappend="${#fields.hasErrors('password')} ? 'invalid'" data-testid="password">
       <small class="field-error" th:if="${#fields.hasErrors('password')}" th:errors="*{password}">error</small>
+      <small class="field-error" th:if="${#fields.hasErrors('passwordWithinHashLimit')}"
+             th:errors="*{passwordWithinHashLimit}" data-testid="password-length-error">error</small>
 
       <label for="confirmPassword">Confirm password</label>
       <input id="confirmPassword" type="password" th:field="*{confirmPassword}" autocomplete="new-password" required

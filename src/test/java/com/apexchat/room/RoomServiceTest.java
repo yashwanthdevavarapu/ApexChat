@@ -60,7 +60,7 @@ class RoomServiceTest {
   @Test
   void createPersistsAndBroadcastsTheRoom() {
     when(rooms.existsBySlug("launch-party")).thenReturn(false);
-    when(rooms.save(any(ChatRoom.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(rooms.saveAndFlush(any(ChatRoom.class))).thenAnswer(inv -> inv.getArgument(0));
 
     RoomDto dto = service.create(new CreateRoomRequest("Launch Party", "  🎉  "), "alice");
 
@@ -79,7 +79,7 @@ class RoomServiceTest {
     assertThatThrownBy(() -> service.create(new CreateRoomRequest("GENERAL", null), "alice"))
         .isInstanceOf(ConflictException.class)
         .hasMessageContaining("#general");
-    verify(rooms, never()).save(any());
+    verify(rooms, never()).saveAndFlush(any());
   }
 
   @Test
@@ -95,5 +95,18 @@ class RoomServiceTest {
         .isInstanceOf(NotFoundException.class)
         .extracting("code")
         .isEqualTo("ROOM_NOT_FOUND");
+  }
+
+  @Test
+  void concurrentDuplicateHittingTheUniqueConstraintIsStillAConflict() {
+    when(rooms.existsBySlug("design-crit")).thenReturn(false); // both racers pass the pre-check
+    when(rooms.saveAndFlush(any(ChatRoom.class)))
+        .thenThrow(new org.springframework.dao.DataIntegrityViolationException("uk_slug"));
+
+    assertThatThrownBy(() -> service.create(new CreateRoomRequest("Design Crit", null), "bob"))
+        .isInstanceOf(ConflictException.class)
+        .extracting("code")
+        .isEqualTo("ROOM_EXISTS");
+    org.mockito.Mockito.verifyNoInteractions(broker);
   }
 }

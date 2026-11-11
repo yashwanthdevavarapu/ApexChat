@@ -4,6 +4,7 @@ import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
 /** Form-backing object for the sign-up page. */
@@ -18,6 +19,12 @@ public class RegistrationForm {
   private String password;
 
   private String confirmPassword;
+
+  /** BCrypt only uses the first 72 <em>bytes</em>; Spring Security rejects longer input. */
+  @AssertTrue(message = "Password is too long (max 72 bytes; non-Latin characters count as 2-4)")
+  public boolean isPasswordWithinHashLimit() {
+    return password == null || password.getBytes(StandardCharsets.UTF_8).length <= 72;
+  }
 
   @AssertTrue(message = "Passwords do not match")
   public boolean isPasswordConfirmed() {

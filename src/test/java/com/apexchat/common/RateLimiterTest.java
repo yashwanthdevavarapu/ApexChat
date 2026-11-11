@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.apexchat.support.MutableClock;
-import com.apexchat.support.TestProperties;
 import java.time.Duration;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,7 +17,7 @@ class RateLimiterTest {
   @BeforeEach
   void setUp() {
     clock = new MutableClock(Instant.parse("2026-01-01T00:00:00Z"));
-    limiter = new RateLimiter(TestProperties.withRateLimit(3, Duration.ofSeconds(10)), clock);
+    limiter = new RateLimiter(3, Duration.ofSeconds(10), clock);
   }
 
   @Test
@@ -64,5 +63,26 @@ class RateLimiterTest {
     }
     clock.advance(Duration.ofSeconds(10));
     assertThatCode(() -> limiter.acquire("alice")).doesNotThrowAnyException();
+  }
+
+  @Test
+  void tryAcquireReportsInsteadOfThrowing() {
+    for (int i = 0; i < 3; i++) {
+      org.assertj.core.api.Assertions.assertThat(limiter.tryAcquire("typer")).isTrue();
+    }
+    org.assertj.core.api.Assertions.assertThat(limiter.tryAcquire("typer")).isFalse();
+  }
+
+  @Test
+  void idleKeysAreSweptSoMemoryDoesNotGrowForever() {
+    for (int i = 0; i < 1000; i++) {
+      limiter.acquire("one-off-user-" + i);
+    }
+    clock.advance(Duration.ofSeconds(11));
+    for (int i = 0; i < 100; i++) {
+      limiter.acquire("active"); // keeps calling until a sweep triggers
+      clock.advance(Duration.ofSeconds(4));
+    }
+    org.assertj.core.api.Assertions.assertThat(limiter.trackedKeys()).isLessThan(10);
   }
 }

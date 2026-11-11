@@ -3,11 +3,13 @@ package com.apexchat.message;
 import com.apexchat.common.ChatException;
 import com.apexchat.common.ErrorEvent;
 import com.apexchat.common.InvalidRequestException;
+import com.apexchat.common.RateLimiter;
 import com.apexchat.user.UserService;
 import java.security.Principal;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageExceptionHandler;
 import org.springframework.messaging.handler.annotation.MessageMapping;
@@ -36,10 +38,15 @@ public class ChatMessagingController {
 
   private final MessageService messageService;
   private final SimpMessagingTemplate broker;
+  private final RateLimiter typingLimiter;
 
-  public ChatMessagingController(MessageService messageService, SimpMessagingTemplate broker) {
+  public ChatMessagingController(
+      MessageService messageService,
+      SimpMessagingTemplate broker,
+      @Qualifier("typingRateLimiter") RateLimiter typingLimiter) {
     this.messageService = messageService;
     this.broker = broker;
+    this.typingLimiter = typingLimiter;
   }
 
   @MessageMapping("/rooms/{slug}/send")
@@ -53,6 +60,9 @@ public class ChatMessagingController {
       @DestinationVariable String slug, @Payload TypingEvent.Request request, Principal user) {
     if (!SLUG.matcher(slug).matches()) {
       throw new InvalidRequestException("INVALID_ROOM", "Invalid room");
+    }
+    if (!typingLimiter.tryAcquire(user.getName())) {
+      return; // typing hints are best-effort: drop the excess silently
     }
     broker.convertAndSend(
         MessageService.roomTopic(slug) + "/typing",
@@ -68,10 +78,12 @@ public class ChatMessagingController {
   @MessageMapping("/dm/{username}/typing")
   public void typingInDirect(
       @DestinationVariable String username, @Payload TypingEvent.Request request, Principal user) {
+    String recipient = UserService.normalize(username);
+    if (recipient.equals(user.getName()) || !typingLimiter.tryAcquire(user.getName())) {
+      return;
+    }
     broker.convertAndSendToUser(
-        UserService.normalize(username),
-        "/queue/typing",
-        new TypingEvent(user.getName(), null, request.typing()));
+        recipient, "/queue/typing", new TypingEvent(user.getName(), null, request.typing()));
   }
 
   /** Expected failures go back only to the session that caused them. */

@@ -30,7 +30,6 @@ public class PresenceController {
 
   @GetMapping("/api/presence")
   public PresenceEvent snapshot() {
-    return new PresenceEvent(
-        PresenceEvent.Type.SNAPSHOT, null, presence.onlineUsers(), clock.instant());
+    return PresenceEvent.of(PresenceEvent.Type.SNAPSHOT, null, presence.roster(), clock.instant());
   }
 }

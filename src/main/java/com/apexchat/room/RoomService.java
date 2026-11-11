@@ -7,6 +7,7 @@ import java.text.Normalizer;
 import java.time.Clock;
 import java.util.List;
 import java.util.Locale;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -47,7 +48,11 @@ public class RoomService {
     return rooms.findBySlug(slug).orElseThrow(() -> NotFoundException.room(slug));
   }
 
-  @Transactional
+  /**
+   * Creates a room and announces it. Not wrapped in a transaction: {@code saveAndFlush} commits on
+   * its own, so the broadcast only goes out for a durable room, and a concurrent duplicate surfaces
+   * here as a constraint violation mapped to the same 409 as the pre-check.
+   */
   public RoomDto create(CreateRoomRequest request, String createdBy) {
     String slug = slugify(request.name());
     if (slug.length() < 2) {
@@ -55,14 +60,23 @@ public class RoomService {
           "INVALID_ROOM_NAME", "Room names need at least two letters or digits");
     }
     if (rooms.existsBySlug(slug)) {
-      throw new ConflictException("ROOM_EXISTS", "A room called #" + slug + " already exists");
+      throw roomExists(slug);
     }
     String description = request.description() == null ? "" : request.description().trim();
-    ChatRoom saved =
-        rooms.save(
-            new ChatRoom(slug, request.name().trim(), description, createdBy, clock.instant()));
+    ChatRoom saved;
+    try {
+      saved =
+          rooms.saveAndFlush(
+              new ChatRoom(slug, request.name().trim(), description, createdBy, clock.instant()));
+    } catch (DataIntegrityViolationException e) {
+      throw roomExists(slug);
+    }
     RoomDto dto = RoomDto.from(saved);
     broker.convertAndSend(ROOMS_TOPIC, dto);
     return dto;
+  }
+
+  private static ConflictException roomExists(String slug) {
+    return new ConflictException("ROOM_EXISTS", "A room called #" + slug + " already exists");
   }
 }

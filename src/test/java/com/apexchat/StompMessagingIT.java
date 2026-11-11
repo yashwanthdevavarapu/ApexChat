@@ -153,7 +153,8 @@ class StompMessagingIT {
         () ->
             broker.convertAndSend(
                 "/topic/presence",
-                new PresenceEvent(PresenceEvent.Type.SNAPSHOT, PROBE, List.of(), Instant.now())));
+                new PresenceEvent(
+                    PresenceEvent.Type.SNAPSHOT, PROBE, List.of(), 0, Instant.now())));
 
     StompSession tab1 = connect(multi);
     PresenceEvent online = pollFor(events, e -> multi.equals(e.username()));
@@ -204,6 +205,52 @@ class StompMessagingIT {
     TypingEvent event = pollFor(typing, e -> alice.equals(e.username()));
     assertThat(event.typing()).isTrue();
     assertThat(event.room()).isEqualTo("engineering");
+  }
+
+  @Test
+  void typingHintsAreThrottledPerUser() throws Exception {
+    String alice = newUser();
+    String bob = newUser();
+    StompSession aliceSession = connect(alice);
+    StompSession bobSession = connect(bob);
+    var typing = subscribe(bobSession, "/topic/rooms/random/typing", TypingEvent.class);
+    awaitReady(
+        typing,
+        () ->
+            broker.convertAndSend(
+                "/topic/rooms/random/typing", new TypingEvent(PROBE, "random", false)));
+
+    for (int i = 0; i < 100; i++) {
+      aliceSession.send("/app/rooms/random/typing", new TypingEvent.Request(i % 2 == 0));
+    }
+
+    int relayed = 0;
+    while (pollMatching(typing, e -> alice.equals(e.username()), 700) != null) {
+      relayed++;
+    }
+    assertThat(relayed).isPositive().isLessThanOrEqualTo(30);
+  }
+
+  @Test
+  void presenceEventsCarryIncreasingVersions() throws Exception {
+    String watcher = newUser();
+    String other = newUser();
+    StompSession watcherSession = connect(watcher);
+    var snapshot = subscribe(watcherSession, "/app/presence", PresenceEvent.class);
+    PresenceEvent first = snapshot.poll(WAIT_SECONDS, TimeUnit.SECONDS);
+    assertThat(first).isNotNull();
+
+    var events = subscribe(watcherSession, "/topic/presence", PresenceEvent.class);
+    awaitReady(
+        events,
+        () ->
+            broker.convertAndSend(
+                "/topic/presence",
+                new PresenceEvent(
+                    PresenceEvent.Type.SNAPSHOT, PROBE, List.of(), 0, Instant.now())));
+    connect(other);
+    PresenceEvent online = pollFor(events, e -> other.equals(e.username()));
+    assertThat(online.version()).isGreaterThan(first.version());
   }
 
   @Test
