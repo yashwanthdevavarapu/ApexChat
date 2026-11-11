@@ -13,7 +13,7 @@ exposes it as `#app[data-csrf-token]`.
 | `GET` | `/api/rooms/{slug}/messages?before={id}&limit={n}` | Channel history, oldest-first page ending before `before` |
 | `POST` | `/api/rooms/{slug}/messages` | Post `{ "content": "…" }` over HTTP (also broadcast live) → `201` |
 | `GET` | `/api/dm/{username}/messages?before={id}&limit={n}` | Direct-message history with `username` |
-| `GET` | `/api/presence` | `{ "type": "SNAPSHOT", "online": ["alice", …] }` |
+| `GET` | `/api/presence` | `{ "type": "SNAPSHOT", "online": ["alice", …], "version": 7 }` |
 | `GET` | `/actuator/health/readiness` | Public readiness probe |
 
 `limit` defaults to 50 and is capped at 100.
@@ -67,7 +67,8 @@ See the [destination table](architecture.md#destinations) for every destination.
 { "username": "alice", "room": "general", "typing": true }
 
 // PresenceEvent: on /topic/presence and /app/presence
-{ "type": "ONLINE", "username": "bob", "online": ["alice", "bob"], "at": "…" }
+{ "type": "ONLINE", "username": "bob", "online": ["alice", "bob"], "version": 7, "at": "…" }
+// clients ignore any presence frame whose version is lower than the last one applied
 
 // ErrorEvent: on /user/queue/errors
 { "code": "RATE_LIMITED", "message": "You are sending messages too quickly. Please slow down." }
