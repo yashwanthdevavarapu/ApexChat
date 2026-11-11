@@ -1,0 +1,48 @@
+name: Bug report
+description: Something is broken or behaves unexpectedly
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for taking the time to report a bug! Please fill in as much as you can.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Include what you expected to happen instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Sign in as two users in separate browsers
+        2. Open #general in both
+        3. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Messaging (rooms)
+        - Direct messages
+        - Presence / typing
+        - Authentication
+        - UI / styling
+        - Deployment (Docker / Postgres)
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version / commit
+      placeholder: v1.0.0 or a commit SHA
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or browser console output
+      render: shell
