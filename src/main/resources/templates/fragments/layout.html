@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:fragment="head(title)">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title th:text="${title} + ' · ApexChat'">ApexChat</title>
+  <link rel="icon" type="image/svg+xml" th:href="@{/favicon.svg}">
+  <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+
+<!-- Brand mark, reused on the auth pages and in the chat sidebar -->
+<svg th:fragment="logo(size)" class="logo" th:attr="width=${size},height=${size}" viewBox="0 0 32 32" aria-hidden="true">
+  <defs>
+    <linearGradient id="apex-grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7c6cff"/>
+      <stop offset="1" stop-color="#22d3ee"/>
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="9" fill="url(#apex-grad)"/>
+  <path d="M9 22.5 16 8l7 14.5h-4.2L16 16.3l-2.8 6.2z" fill="#fff"/>
+</svg>
+
+<!-- Left-hand marketing panel on login / register -->
+<section th:fragment="authHero" class="auth-hero" aria-hidden="true">
+  <div class="auth-hero-inner">
+    <div class="brand-row">
+      <svg th:replace="~{fragments/layout :: logo(36)}"></svg>
+      <span class="brand-name">ApexChat</span>
+    </div>
+    <h2>Conversations at the speed of thought.</h2>
+    <p>Persistent WebSocket connections push every message, typing hint and presence change the instant it happens.</p>
+    <ul class="hero-points">
+      <li><span class="pill">STOMP</span> Pub/sub channels and private queues</li>
+      <li><span class="pill">Presence</span> Live roster across every open tab</li>
+      <li><span class="pill">Secure</span> Session auth, CSRF-checked CONNECT</li>
+    </ul>
+    <div class="hero-preview">
+      <div class="bubble"><b>maya</b> Deploy #482 is green on staging 🚀</div>
+      <div class="bubble mine"><b>you</b> Promoting to prod now</div>
+      <div class="typing-dots"><span></span><span></span><span></span> dev is typing…</div>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

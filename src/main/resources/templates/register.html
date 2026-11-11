@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{fragments/layout :: head('Create account')}"></head>
+<body class="auth-page">
+<main class="auth-shell">
+  <section th:replace="~{fragments/layout :: authHero}"></section>
+
+  <section class="auth-card-wrap">
+    <form class="auth-card" th:action="@{/register}" th:object="${form}" method="post" novalidate
+          data-testid="register-form">
+      <div class="brand-row compact">
+        <svg th:replace="~{fragments/layout :: logo(28)}"></svg>
+        <span class="brand-name">ApexChat</span>
+      </div>
+      <h1>Create your account</h1>
+      <p class="muted">Pick a handle. Teammates will see it next to every message.</p>
+
+      <div th:if="${#fields.hasGlobalErrors()}" class="alert alert-error" role="alert">
+        <span th:each="err : ${#fields.globalErrors()}" th:text="${err}">error</span>
+      </div>
+
+      <label for="username">Username</label>
+      <input id="username" type="text" th:field="*{username}" autocomplete="username" required autofocus
+             th:classappend="${#fields.hasErrors('username')} ? 'invalid'" data-testid="username">
+      <small class="field-error" th:if="${#fields.hasErrors('username')}" th:errors="*{username}"
+             data-testid="username-error">error</small>
+      <small class="hint" th:unless="${#fields.hasErrors('username')}">3-20 letters, digits or underscores</small>
+
+      <label for="password">Password</label>
+      <input id="password" type="password" th:field="*{password}" autocomplete="new-password" required
+             th:classappend="${#fields.hasErrors('password')} ? 'invalid'" data-testid="password">
+      <small class="field-error" th:if="${#fields.hasErrors('password')}" th:errors="*{password}">error</small>
+
+      <label for="confirmPassword">Confirm password</label>
+      <input id="confirmPassword" type="password" th:field="*{confirmPassword}" autocomplete="new-password" required
+             th:classappend="${#fields.hasErrors('passwordConfirmed')} ? 'invalid'" data-testid="confirm-password">
+      <small class="field-error" th:if="${#fields.hasErrors('passwordConfirmed')}" th:errors="*{passwordConfirmed}">error</small>
+
+      <button type="submit" class="btn btn-primary btn-block" data-testid="register-submit">Create account</button>
+
+      <p class="switch">Already have an account? <a th:href="@{/login}">Sign in</a></p>
+    </form>
+  </section>
+</main>
+</body>
+</html>
