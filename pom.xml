@@ -21,7 +21,7 @@
     <java.version>17</java.version>
     <stompjs.version>7.3.0</stompjs.version>
     <jacoco.version>0.8.14</jacoco.version>
-    <spotless.version>2.46.1</spotless.version>
+    <spotless.version>3.11.0</spotless.version>
     <!-- Line coverage gate enforced by `mvn verify` -->
     <coverage.minimum>0.80</coverage.minimum>
   </properties>
