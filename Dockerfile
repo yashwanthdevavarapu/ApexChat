@@ -10,7 +10,7 @@ RUN --mount=type=cache,target=/root/.m2 mvn -B -q package -DskipTests -Djacoco.s
  && java -Djarmode=tools -jar target/apexchat.jar extract --layers --launcher --destination /extracted
 
 # ---- Runtime ---------------------------------------------------------------
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:25-jre-alpine
 LABEL org.opencontainers.image.title="ApexChat" \
       org.opencontainers.image.description="Real-time chat over WebSocket + STOMP with Spring Boot" \
       org.opencontainers.image.licenses="MIT"
